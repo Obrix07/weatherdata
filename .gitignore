@@ -1,0 +1,19 @@
+# Node modules
+node_modules/
+
+# Python virtual environment
+venv/
+
+# Environment variables
+.env
+
+# Compiled files
+__pycache__/
+*.py[cod]
+
+# Logs
+*.log
+debug.log
+
+# Tailwind output
+*.css.map
