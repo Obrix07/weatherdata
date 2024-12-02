@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from auth import get_current_user
-from sqlalchemy import select
+from sqlalchemy import select, func, Integer
 from database import get_db
 from models import GSODData
 from fastapi import Query
+from sqlalchemy.sql.expression import cast
 
 router = APIRouter()
 
@@ -103,3 +104,55 @@ def get_all_stations(db: Session = Depends(get_db), user=Depends(get_current_use
         return {"stations": [station[0] for station in stations]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la récupération des stations : {e}")
+
+@router.get("/total-precipitation")
+def get_total_precipitation(station_name: str = Query(...), db: Session = Depends(get_db)):
+    """
+    Retourne les précipitations totales par jour pour une station donnée.
+    """
+    try:
+        results = (
+            db.query(GSODData.DATE, func.sum(GSODData.PRCP).label("total_precipitation"))
+            .filter(GSODData.NAME == station_name)
+            .group_by(GSODData.DATE)
+            .order_by(GSODData.DATE)
+            .all()
+        )
+        return [{"date": str(result.DATE), "total_precipitation": result.total_precipitation} for result in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la récupération des précipitations : {e}")
+
+
+
+@router.get("/max-wind-speed")
+def get_max_wind_speed(station_name: str = Query(...), db: Session = Depends(get_db)):
+    """
+    Retourne la vitesse maximale du vent par jour pour une station donnée.
+    """
+    try:
+        results = (
+            db.query(GSODData.DATE, func.max(GSODData.MXSPD).label("max_wind_speed"))
+            .filter(GSODData.NAME == station_name)
+            .group_by(GSODData.DATE)
+            .order_by(GSODData.DATE)
+            .all()
+        )
+        return [{"date": str(result.DATE), "max_wind_speed": result.max_wind_speed} for result in results]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la récupération des vitesses de vent : {e}")
+
+@router.get("/correlation-altitude-temperature")
+def correlation_altitude_temperature(db: Session = Depends(get_db)):
+    """
+    Retourne la corrélation entre l'altitude et la température moyenne.
+    """
+    try:
+        query = db.query(
+            func.corr(GSODData.ELEVATION, GSODData.TEMP).label("correlation")
+        ).filter(GSODData.ELEVATION.isnot(None), GSODData.TEMP.isnot(None))
+        result = query.one()
+        return {"correlation": result.correlation}
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Erreur lors de la récupération des données : {e}"
+        )
